@@ -47,6 +47,7 @@ from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.menus import CompletionsMenu
 from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.keys import Keys
 from prompt_toolkit import print_formatted_text as _pt_print
 from prompt_toolkit.formatted_text import ANSI as _PT_ANSI
 try:
@@ -64,6 +65,7 @@ from agent.usage_pricing import (
     format_token_count_compact,
 )
 from hermes_cli.banner import _format_context_length
+from hermes_cli import terminal_keyboard as _tkbd
 
 _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
@@ -6115,6 +6117,7 @@ class HermesCLI:
         
         # Key bindings for the input area
         kb = KeyBindings()
+        _tkbd.register_word_delete_keybindings(kb)
         
         @kb.add('enter')
         def handle_enter(event):
@@ -7193,7 +7196,18 @@ class HermesCLI:
         # Start processing thread
         process_thread = threading.Thread(target=process_loop, daemon=True)
         process_thread.start()
-        
+
+        terminal_keyboard_cleanup = None
+        pending_terminal_key_presses = []
+        try:
+            _tkbd.install_all()
+            # Detection and mode enable are deferred — install_all() registers
+            # the escape sequences so prompt_toolkit recognises them if the
+            # terminal happens to send them, but we don't probe or switch
+            # modes ourselves to avoid interfering with streaming I/O.
+        except Exception:
+            pass
+
         # Register atexit cleanup so resources are freed even on unexpected exit
         atexit.register(_run_cleanup)
         
